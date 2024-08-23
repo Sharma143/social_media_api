@@ -8,6 +8,7 @@ import useStyles from "./styles"
 import { useDispatch } from "react-redux"
 import { deletePost, likePost } from "../../../actions/posts"
 const Posts = ({ post, setCurrentId }) => {
+    console.log(post,"posted")
     const classes = useStyles();
     const dispatch = useDispatch();
     return (
@@ -26,7 +27,8 @@ const Posts = ({ post, setCurrentId }) => {
                 </Button>
             </div>
             <div className={classes.details}>
-                <Typography variant="body2" color="textSecondary">{post.tags.map((tag) => `#${tag} `)}</Typography>
+                {/* <Typography variant="body2" color="textSecondary">{post?.tags?.map((tag) => `#${tag} `)}</Typography> */}
+                <Typography variant="body2" color="textSecondary">{post?.tags}</Typography>
             </div>
             <Typography className={classes.title} variant="h5" gutterBottom>{post.title}</Typography>
             <CardContent>
