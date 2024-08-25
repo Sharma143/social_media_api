@@ -7,7 +7,7 @@ import { CircularProgress, Grid } from '@material-ui/core'
 const Posts = ({ setCurrentId }) => {
     const classes = useStyles();
     const posts = useSelector(state => state.posts)
-    console.log(posts?.data, "posts")
+    console.log(posts, "posts")
     const data = posts?.data?.map((po)=>po.title)
     console.log('data :', data);
     return (
