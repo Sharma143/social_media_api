@@ -1,7 +1,7 @@
 import axios from "axios"
 
 // const url = "https://pleasent-memories.herokuapp.com/posts"
-const API = axios.create({ baseUrl: 'http://localhost:5000' })
+const API = axios.create({ baseUrl: 'https://bh00cut60j.execute-api.ap-south-1.amazonaws.com' })
 // const API = axios.create({ baseUrl: url })
 
 API.interceptors.request.use((req) => {
