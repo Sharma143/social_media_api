@@ -6,13 +6,31 @@ AWS.config.update({
     region: 'ap-south-1', // or your region
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-  });
-  
-  const dynamoDb = new AWS.DynamoDB.DocumentClient();
-  import dotenv from 'dotenv';
-  dotenv.config();
-  
+});
+
+const s3 = new AWS.S3();
+
+const dynamoDb = new AWS.DynamoDB.DocumentClient();
+import dotenv from 'dotenv';
+dotenv.config();
+
 const TABLE_NAME = 'posts'; // Replace with your DynamoDB table name
+
+// Multer configuration for file uploads
+// const storage = multer.memoryStorage();
+// const upload = multer({ storage: storage });
+
+
+const uploadFileToS3 = (buffer, mimeType, fileName) => {
+    const params = {
+        Bucket: process.env.AWS_S3_NAME, // Your S3 bucket name
+        Key: `${Date.now()}_${fileName}`, // File name with timestamp
+        Body: buffer,
+        ContentType: mimeType,
+    };
+
+    return s3.upload(params).promise();
+};
 
 // Get all posts with pagination
 export const getPosts = async (req, res) => {
@@ -27,7 +45,7 @@ export const getPosts = async (req, res) => {
             Select: 'COUNT'
         };
         const total = await dynamoDb.scan(totalParams).promise();
-        
+
         const params = {
             TableName: TABLE_NAME,
             Limit: LIMIT,
@@ -35,7 +53,7 @@ export const getPosts = async (req, res) => {
             ScanIndexForward: false
         };
         const result = await dynamoDb.scan(params).promise();
-        
+
         res.json({
             data: result.Items,
             currentPage: Number(page),
@@ -114,22 +132,36 @@ export const getPost = async (req, res) => {
     }
 };
 
-// Create a new post
 export const createPost = async (req, res) => {
+    console.log('#req', req, res);
     const post = req.body;
-
-    const newPost = {
-        ...post,
-        id: Date.now().toString(), // Generate a unique ID
-        createdAt: new Date().toISOString()
-    };
-
-    const params = {
-        TableName: TABLE_NAME,
-        Item: newPost
-    };
+    const file = req.body.selectedFile;
 
     try {
+        let fileUrl = null;
+
+        // If a file is uploaded, upload it to S3
+        if (file) {
+            const base64Data = file.split(';base64,').pop();
+            const mimeType = file.split(';')[0].split(':')[1]; // Extract the MIME type
+            const buffer = Buffer.from(base64Data, 'base64');
+
+            const s3Response = await uploadFileToS3(buffer, mimeType, `${req.body.creator}_${req.body.title}_File`);
+            fileUrl = s3Response.Location; // The file URL in S3
+        }
+
+        const newPost = {
+            ...post,
+            id: Date.now().toString(), // Generate a unique ID
+            createdAt: new Date().toISOString(),
+            selectedFile: fileUrl // Save the file URL in the post
+        };
+
+        const params = {
+            TableName: TABLE_NAME,
+            Item: newPost
+        };
+
         await dynamoDb.put(params).promise();
         res.status(201).json(newPost);
     } catch (error) {
@@ -140,18 +172,39 @@ export const createPost = async (req, res) => {
 // Update a post
 export const updatePost = async (req, res) => {
     const { id } = req.params;
-    const { title, message, creator, selectedFile, tags } = req.body;
+    const { title, message, creator, tags } = req.body;
+    const file = req.body.selectedFile; // Accessing the uploaded file from the request
 
     if (!id) return res.status(404).send(`No post with id: ${id}`);
 
-    const updatedPost = { title, message, creator, selectedFile, tags, id, createdAt: new Date().toISOString() };
-
-    const params = {
-        TableName: TABLE_NAME,
-        Item: updatedPost
-    };
-
     try {
+        let fileUrl = req.body.selectedFile; // Use existing file URL if no new file is uploaded
+
+        // If a new file is uploaded, upload it to S3
+        if (file) {
+            const base64Data = file.split(';base64,').pop();
+            const mimeType = file.split(';')[0].split(':')[1]; // Extract the MIME type
+            const buffer = Buffer.from(base64Data, 'base64');
+
+            const s3Response = await uploadFileToS3(buffer, mimeType, `${creator}_${title}_File`);
+            fileUrl = s3Response.Location; // The new file URL in S3
+        }
+
+        const updatedPost = {
+            title,
+            message,
+            creator,
+            tags,
+            selectedFile: fileUrl,
+            id,
+            createdAt: new Date().toISOString(),
+        };
+
+        const params = {
+            TableName: TABLE_NAME,
+            Item: updatedPost,
+        };
+
         await dynamoDb.put(params).promise();
         res.json(updatedPost);
     } catch (error) {
